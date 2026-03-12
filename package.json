@@ -1,0 +1,19 @@
+{
+    "name": "ai_study_backend",
+    "version": "1.0.0",
+    "description": "Backend services",
+    "main": "server.js",
+    "dependencies": {
+        "@google/generative-ai": "^0.24.1",
+        "cors": "^2.8.5",
+        "dotenv": "^17.3.1",
+        "express": "^4.19.2",
+        "google-auth-library": "^10.6.1",
+        "groq-sdk": "^0.37.0",
+        "multer": "^1.4.5-lts.1",
+        "officeparser": "^6.0.4",
+        "pdf-parse": "^1.1.1",
+        "sqlite3": "^5.1.7",
+        "yt-search": "^2.13.1"
+    }
+}

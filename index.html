@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Study Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f121d;
+            --bg-card: rgba(29, 33, 50, 0.4);
+            --bg-card-hover: rgba(40, 45, 65, 0.6);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --primary: #9d4edd;
+            --primary-hover: #7b2cbf;
+            --primary-glow: rgba(157, 78, 221, 0.4);
+            --secondary: #00f5d4;
+            --secondary-glow: rgba(0, 245, 212, 0.3);
+            --text-main: #f8f9fa;
+            --text-muted: #adb5bd;
+            --success: #38b000;
+            --warning: #fca311;
+        }
+
+        /* Animated Background Canvas */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Modal styling for Mind Map notes */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: #111424;
+            border: 1px solid rgba(157, 78, 221, 0.3);
+            border-radius: 16px;
+            padding: 2.5rem;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--danger-glow);
+        }
+
+        .modal-title {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+        }
+
+        .modal-body {
+            color: var(--text-main);
+            line-height: 1.7;
+            font-size: 1.05rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(157, 78, 221, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(0, 245, 212, 0.1) 0%, transparent 40%);
+            background-attachment: fixed;
+            overflow-x: hidden;
+        }
+
+        /* Reusable Glassmorphism */
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        /* Layout Structure */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
+            gap: 1.5rem;
+            padding: 1.5rem;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: 1.5rem;
+            height: calc(100vh - 3rem);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 3rem;
+        }
+
+        .brand-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .brand h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .brand span {
+            color: var(--secondary);
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .nav-item a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 1.05rem;
+            font-weight: 500;
+            padding: 0.8rem 1.2rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-item.active a,
+        .nav-item a:hover {
+            background: rgba(157, 78, 221, 0.15);
+            color: var(--text-main);
+            border-left: 4px solid var(--primary);
+            padding-left: calc(1.2rem - 4px);
+        }
+
+        /* Main Workspace Area */
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            padding-right: 1rem;
+        }
+
+        /* Header / User Stats */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .welcome-text h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            background: linear-gradient(to right, #fff, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .stat-badge {
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--secondary);
+        }
+
+        /* Content Grid Structure */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        /* Upload & Processing Section */
+        .upload-card {
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .section-header {
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .drop-area {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .drop-area:hover,
+        .drop-area.drag-active {
+            border-color: var(--secondary);
+            background: rgba(0, 245, 212, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .drop-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+            transition: 0.3s;
+        }
+
+        .drop-area:hover .drop-icon {
+            transform: scale(1.1);
+            opacity: 1;
+        }
+
+        .text-separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: var(--text-muted);
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .text-separator::before,
+        .text-separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--border-glass);
+            margin: 0 15px;
+        }
+
+        .note-input {
+            width: 100%;
+            height: 140px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 1.2rem;
+            color: var(--text-main);
+            font-size: 1rem;
+            resize: none;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .note-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(157, 78, 221, 0.1);
+        }
+
+        .action-button {
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+            border: none;
+            padding: 1.2rem;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+
+        .action-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px var(--primary-glow);
+        }
+
+        /* Right Sidebar - Output Previews & Modules */
+        .modules-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .module-card {
+            padding: 1.5rem;
+            transition: 0.3s;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .module-card:hover {
+            transform: translateX(5px);
+            background: var(--bg-card-hover);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .module-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .module-info h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
+        .module-info p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Video Recommendations Grid */
+        .roadmap-section {
+            padding: 2rem;
+            margin-top: 1rem;
+        }
+
+        .video-tracks {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .video-card {
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-glass);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .video-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--secondary);
+            box-shadow: 0 5px 20px var(--secondary-glow);
+        }
+
+        .video-thumb {
+            height: 130px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            position: relative;
+        }
+
+        .video-thumb::after {
+            content: '▶';
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .video-details {
+            padding: 1rem;
+        }
+
+        .video-details h4 {
+            font-size: 1rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .video-tag {
+            font-size: 0.75rem;
+            background: rgba(0, 245, 212, 0.1);
+            color: var(--secondary);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .dashboard-controls {
+            margin-bottom: 2rem;
+            padding: 3rem;
+        }
+
+        .controls-header {
+            margin-bottom: 2rem;
+        }
+
+        .controls-grid {
+            display: flex;
+            gap: 3rem;
+            align-items: stretch;
+        }
+
+        .control-box {
+            flex: 1;
+        }
+
+        .control-divider {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 1rem;
+            position: relative;
+        }
+
+        .control-divider::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(-50%);
+        }
+
+        .divider-text {
+            background: rgba(10, 14, 23, 1);
+            padding: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1;
+        }
+
+        /* Modal styling for Mind Map notes */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: #111424;
+            border: 1px solid rgba(157, 78, 221, 0.3);
+            border-radius: 16px;
+            padding: 2.5rem;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--danger-glow);
+        }
+
+        .modal-title {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+        }
+
+        .modal-body {
+            color: var(--text-main);
+            line-height: 1.7;
+            font-size: 1.05rem;
+        }
+
+        @media(max-width: 1024px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .controls-grid {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+
+            .control-divider::before {
+                top: 50%;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: 1px;
+                transform: translateY(-50%);
+            }
+
+            .spline-hero {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .hero-right {
+                height: 260px;
+            }
+        }
+
+        /* ===== Spline 3D Hero ===== */
+        .spline-hero {
+            display: flex;
+            align-items: stretch;
+            background: #050510;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            overflow: hidden;
+            height: 420px;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .hero-spotlight {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(157, 78, 221, 0.18) 0%, transparent 70%);
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: left 0.08s ease, top 0.08s ease;
+            left: 30%;
+            top: 50%;
+            z-index: 1;
+        }
+
+        .hero-left {
+            flex: 1;
+            padding: 2.5rem 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            padding: 0.3rem 1rem;
+            background: rgba(157, 78, 221, 0.15);
+            border: 1px solid rgba(157, 78, 221, 0.4);
+            border-radius: 30px;
+            font-size: 0.8rem;
+            color: var(--primary);
+            letter-spacing: 0.05em;
+            margin-bottom: 1.2rem;
+            width: fit-content;
+        }
+
+        .hero-title {
+            font-size: clamp(1.8rem, 3vw, 2.8rem);
+            font-weight: 800;
+            line-height: 1.15;
+            color: #f0f0f8;
+            margin-bottom: 1rem;
+        }
+
+        .hero-gradient {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-desc {
+            color: rgba(168, 178, 209, 0.85);
+            font-size: 0.95rem;
+            line-height: 1.65;
+            max-width: 380px;
+            margin-bottom: 2rem;
+        }
+
+        .hero-stats {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+        }
+
+        .hstat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .hstat-num {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .hstat-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .hstat-div {
+            width: 1px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .hero-right {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        spline-viewer {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Hide the 'Built with Spline' watermark */
+        spline-viewer::part(logo) {
+            display: none !important;
+        }
+    </style>
+</head>
+
+
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Modal for Mind Map detailed notes -->
+    <div class="modal-overlay" id="note-modal">
+        <div class="modal-content">
+            <span class="modal-close"
+                onclick="document.getElementById('note-modal').classList.remove('active')">&times;</span>
+            <h3 class="modal-title" id="modal-title">Subtopic Note</h3>
+            <div class="modal-body" id="modal-body">
+                Detailed notes will appear here.
+            </div>
+        </div>
+    </div>
+
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar glass-panel">
+            <div class="brand">
+                <div class="brand-icon">⌘</div>
+                <h2>Brain<span>Boost</span></h2>
+            </div>
+
+            <ul class="nav-menu">
+                <li class="nav-item active" data-nav-target="dashboard"><a href="#">📊 Dashboard</a></li>
+                <li class="nav-item" data-nav-target="concept"><a href="#">🔬 In-Depth Concept</a></li>
+                <li class="nav-item" data-nav-target="notes"><a href="#">📑 Exam Notes</a></li>
+                <li class="nav-item" data-nav-target="mcqs"><a href="#">📝 MCQ Quiz</a></li>
+                <li class="nav-item" data-nav-target="mindmap"><a href="#">🧠 Mind Map</a></li>
+                <li class="nav-item" data-nav-target="subjective"><a href="#">🎯 2/5 Marks Prep</a></li>
+                <li class="nav-item" data-nav-target="youtube"><a href="#"> Video Links</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Spline 3D Hero Banner -->
+            <div class="spline-hero" id="spline-hero">
+                <!-- Spotlight effect -->
+                <div class="hero-spotlight" id="hero-spotlight"></div>
+
+                <!-- Left Content -->
+                <div class="hero-left">
+                    <div class="hero-badge">✦ AI-Powered Learning</div>
+                    <h1 class="hero-title">Transform your<br><span class="hero-gradient">Study Materials</span></h1>
+                    <p class="hero-desc">Upload PDFs, paste notes, or snap a screenshot. BrainBoost turns raw content
+                        into MCQ quizzes, mind maps, and more — instantly.</p>
+                    <div class="hero-stats">
+                        <div class="hstat"><span class="hstat-num">15-20</span><span class="hstat-label">MCQs</span>
+                        </div>
+                        <div class="hstat-div"></div>
+                        <div class="hstat"><span class="hstat-num">10</span><span class="hstat-label">Q&amp;A
+                                Sets</span></div>
+                        <div class="hstat-div"></div>
+                        <div class="hstat"><span class="hstat-num">AI</span><span class="hstat-label">Mind Map</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Spline 3D Scene -->
+                <div class="hero-right">
+                    <script type="module"
+                        src="https://unpkg.com/@splinetool/viewer@1.9.79/build/spline-viewer.js"></script>
+                    <spline-viewer url="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+                        style="width:100%;height:100%;"></spline-viewer>
+                </div>
+            </div>
+
+            <!-- Dashboard Controls (Knowledge Input) -->
+            <section class="dashboard-controls glass-panel" id="dashboard-controls">
+                <div class="controls-header">
+                    <h2 class="section-header" style="margin-bottom:0.2rem;">📥 Input Materials</h2>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">Provide your source content and BrainBoost
+                        will generate the interactive modules.</p>
+                </div>
+
+                <div class="controls-grid">
+                    <!-- Left: File Drop -->
+                    <div class="control-box">
+                        <div class="drop-area" id="drop-zone"
+                            style="height:100%; display:flex; flex-direction:column; justify-content:center;">
+                            <div class="drop-icon">📄</div>
+                            <h3 style="margin-bottom: 0.5rem; font-size:1.1rem;">Drop your PDF or Image</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem;">Drag & drop or click to browse</p>
+                        </div>
+                    </div>
+
+                    <!-- Middle: Divider -->
+                    <div class="control-divider">
+                        <span class="divider-text">OR</span>
+                    </div>
+
+                    <!-- Right: Text Input -->
+                    <div class="control-box" style="display:flex; flex-direction:column;">
+                        <textarea class="note-input"
+                            placeholder="Paste your raw lecture notes, syllabus, or copied text here..."
+                            style="flex:1; margin-bottom:1rem; min-height:120px;"></textarea>
+                        <button class="action-button" id="generate-btn" style="width:100%;">
+                            <span>🚀 Generate Study Modules</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- AI Output Viewer -->
+            <section class="glass-panel" id="api-output-view" style="display: none; margin-top: 2rem;">
+                <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
+                    <h2 class="section-header" id="tab-title" style="margin-bottom: 0;">✨ AI Generated Module</h2>
+                </div>
+
+                <div id="view-concept" class="tab-content" style="display: none; margin-top: 1.5rem; line-height: 1.6;">
+                </div>
+                <div id="view-notes" class="tab-content" style="display: none; margin-top: 1.5rem; line-height: 1.6;">
+                </div>
+                <div id="view-mcqs" class="tab-content" style="display: none; margin-top: 1.5rem; line-height: 1.6;">
+                </div>
+                <div id="view-mindmap" class="tab-content" style="display: none; margin-top: 1.5rem; line-height: 1.6;">
+                </div>
+                <div id="view-subjective" class="tab-content"
+                    style="display: none; margin-top: 1.5rem; line-height: 1.6;">
+                </div>
+                <div id="view-youtube" class="tab-content" style="display: none; margin-top: 1.5rem; line-height: 1.6;">
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Interface scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropZone = document.getElementById('drop-zone');
+
+            // Aggressive Shadow DOM logo hider for Spline Viewer
+            setTimeout(() => {
+                const splineViewer = document.querySelector('spline-viewer');
+                if (splineViewer && splineViewer.shadowRoot) {
+                    const logo = splineViewer.shadowRoot.querySelector('#logo');
+                    if (logo) logo.style.display = 'none';
+                }
+            }, 2000); // Wait 2s for Spline to mount and build its shadow tree
+
+            // Spotlight mouse tracking for hero
+            var hero = document.getElementById('spline-hero');
+            var spot = document.getElementById('hero-spotlight');
+            if (hero && spot) {
+                hero.addEventListener('mousemove', function (e) {
+                    var rect = hero.getBoundingClientRect();
+                    spot.style.left = (e.clientX - rect.left) + 'px';
+                    spot.style.top = (e.clientY - rect.top) + 'px';
+                });
+            }
+
+            // View Swapper logic
+            function showTab(targetId, title) {
+                document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+                const activeTab = document.getElementById('view-' + targetId);
+                if (activeTab) {
+                    activeTab.style.display = 'block';
+                    document.getElementById('tab-title').innerHTML = `✨ ${title}`;
+                }
+            }
+
+            // Wire sidebar nav items as tab switchers
+            document.querySelectorAll('.nav-item[data-nav-target]').forEach(function (item) {
+                item.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var target = item.getAttribute('data-nav-target');
+                    if (target === 'dashboard') return;
+                    var resultsView = document.getElementById('api-output-view');
+                    if (resultsView.style.display !== 'none') {
+                        var labels = { concept: 'In-Depth Concept Mastery', notes: 'Exam Ready Notes', mcqs: 'MCQ Quiz', mindmap: 'Mind Map', subjective: 'Subjective Q&A', youtube: 'Video Links' };
+                        showTab(target, labels[target] || target);
+                        document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.remove('active'); });
+                        item.classList.add('active');
+                        resultsView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                        alert('Upload a file or paste text first to generate materials!');
+                    }
+                });
+            });
+
+            function renderAIOutput(data) {
+                document.getElementById('api-output-view').style.display = 'block';
+
+                // Build HTML string for In-Depth Concept
+                if (data.concept_in_depth && data.concept_in_depth.length > 0) {
+                    const conceptContainer = document.getElementById('view-concept');
+                    conceptContainer.innerHTML = '';
+
+                    data.concept_in_depth.forEach(function (block) {
+                        var card = document.createElement('div');
+                        card.style.cssText = 'background:rgba(0,0,0,0.3);padding:2rem;border-radius:12px;margin-bottom:1.5rem;border:1px solid rgba(0,245,212,0.15); box-shadow: 0 8px 32px rgba(0,0,0,0.2);';
+
+                        var topicEl = document.createElement('h3');
+                        topicEl.style.cssText = 'color:var(--primary);margin-bottom:1.5rem;font-size:1.5rem;border-bottom:1px solid rgba(0,245,212,0.3);padding-bottom:0.8rem;';
+                        topicEl.textContent = '🔬 Mastery: ' + block.concept;
+
+                        var contentEl = document.createElement('div');
+                        contentEl.style.cssText = 'color:var(--text-main);line-height:1.8;font-size:1.1rem;white-space:pre-wrap;';
+                        contentEl.textContent = block.deep_dive;
+
+                        card.appendChild(topicEl);
+                        card.appendChild(contentEl);
+                        conceptContainer.appendChild(card);
+                    });
+                }
+
+                // Build HTML string for Exam Ready Notes
+                if (data.exam_notes && data.exam_notes.length > 0) {
+                    const notesContainer = document.getElementById('view-notes');
+                    notesContainer.innerHTML = '';
+
+                    data.exam_notes.forEach(function (noteBlock) {
+                        var card = document.createElement('div');
+                        card.style.cssText = 'background:rgba(0,0,0,0.25);padding:1.5rem;border-radius:12px;margin-bottom:1.5rem;border:1px solid rgba(255,255,255,0.06);';
+
+                        var topicEl = document.createElement('h3');
+                        topicEl.style.cssText = 'color:var(--primary);margin-bottom:1rem;font-size:1.3rem;border-bottom:1px solid rgba(157,78,221,0.3);padding-bottom:0.5rem;';
+                        topicEl.textContent = '📌 ' + noteBlock.topic;
+
+                        var contentEl = document.createElement('div');
+                        contentEl.style.cssText = 'color:var(--text-main);line-height:1.7;font-size:1.05rem;white-space:pre-wrap;';
+                        contentEl.textContent = noteBlock.content;
+
+                        card.appendChild(topicEl);
+                        card.appendChild(contentEl);
+                        notesContainer.appendChild(card);
+                    });
+                }
+
+                // Build HTML string for YouTube Queries
+                if (data.youtube && data.youtube.length > 0) {
+                    const ytContainer = document.getElementById('view-youtube');
+                    ytContainer.innerHTML = '';
+                    const ytList = document.createElement('div');
+                    ytList.style.cssText = 'display:flex; flex-direction: column; gap: 1rem;';
+
+                    data.youtube.forEach(function (query, index) {
+                        var encodedQuery = encodeURIComponent(query);
+                        var card = document.createElement('a');
+                        card.href = 'https://www.youtube.com/results?search_query=' + encodedQuery;
+                        card.target = '_blank';
+                        card.className = 'video-card';
+                        card.style.cssText = 'text-decoration:none;display:flex;align-items:center;gap:1rem;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);padding:1rem;border-radius:12px;color:var(--text-main);font-weight:500;transition:all 0.3s ease;margin-bottom:1rem;';
+
+                        var thumb = document.createElement('div');
+                        thumb.id = 'yt-thumb-' + index;
+                        thumb.style.cssText = "background:linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.6)),url('https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=200&auto=format&fit=crop');background-size:cover;background-position:center;width:100px;height:65px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+                        thumb.innerHTML = '<span style="background:rgba(255,0,0,0.9);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:0.8rem;">\u25b6</span>';
+
+                        var info = document.createElement('div');
+                        info.innerHTML = '<div style="font-size:0.8rem;color:#ff4757;margin-bottom:0.2rem;">Watch on YouTube</div><div style="font-size:1.1rem;">' + query + '</div>';
+
+                        card.appendChild(thumb);
+                        card.appendChild(info);
+                        ytList.appendChild(card);
+
+                        // Fetch real thumbnail from backend scraper
+                        (function (idx, enc) {
+                            fetch('/api/youtube-thumbnail?q=' + enc)
+                                .then(function (r) { return r.json(); })
+                                .then(function (t) {
+                                    var el = document.getElementById('yt-thumb-' + idx);
+                                    if (el && t.thumbnail) {
+                                        el.style.background = "linear-gradient(rgba(0,0,0,0.2),rgba(0,0,0,0.4)),url('" + t.thumbnail + "')";
+                                        el.style.backgroundSize = 'cover';
+                                        el.style.backgroundPosition = 'center';
+                                    }
+                                })
+                                .catch(function (e) { console.error('Thumbnail fetch failed', e); });
+                        })(index, encodedQuery);
+                    });
+                    ytContainer.appendChild(ytList);
+                }
+
+                // Build Interactive MCQ Quiz using DOM
+                if (data.mcqs && data.mcqs.length > 0) {
+                    var mcqContainer = document.getElementById('view-mcqs');
+                    mcqContainer.innerHTML = '';
+                    var quizState = { score: 0 };
+                    var scoreText = document.createElement('div');
+                    scoreText.id = 'quiz-score-bar';
+                    scoreText.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding:1rem 1.5rem;background:rgba(157,78,221,0.1);border:1px solid rgba(157,78,221,0.3);border-radius:12px;';
+                    scoreText.innerHTML = '<span style="color:var(--text-muted)">Click an option to answer</span><span id="quiz-score" style="font-weight:700;color:var(--secondary)">Score: 0/' + data.mcqs.length + '</span>';
+                    mcqContainer.appendChild(scoreText);
+                    data.mcqs.forEach(function (q, i) {
+                        var card = document.createElement('div');
+                        card.style.cssText = 'background:rgba(0,0,0,0.25);padding:1.5rem;border-radius:12px;margin-bottom:1rem;border:1px solid rgba(255,255,255,0.06);';
+                        var qText = document.createElement('div');
+                        qText.style.cssText = 'font-size:1.05rem;font-weight:600;color:var(--primary);margin-bottom:1rem;';
+                        qText.textContent = 'Q' + (i + 1) + ': ' + q.question;
+                        card.appendChild(qText);
+                        var grid = document.createElement('div');
+                        grid.style.cssText = 'display:grid;gap:8px;';
+                        var done = false;
+                        q.options.forEach(function (opt) {
+                            var btn = document.createElement('button');
+                            btn.textContent = opt;
+                            btn.style.cssText = 'padding:10px 14px;background:rgba(157,78,221,0.08);border:1px solid rgba(157,78,221,0.2);border-radius:8px;color:var(--text-main);cursor:pointer;text-align:left;font-size:0.95rem;transition:all 0.2s;';
+                            btn.onmouseover = function () { if (!done) this.style.background = 'rgba(157,78,221,0.22)'; };
+                            btn.onmouseout = function () { if (!done) this.style.background = 'rgba(157,78,221,0.08)'; };
+                            btn.onclick = function () {
+                                if (done) return; done = true;
+                                var correct = opt === q.answer;
+                                if (correct) { quizState.score++; btn.style.background = 'rgba(56,176,0,0.2)'; btn.style.borderColor = '#38b000'; btn.style.color = '#5af542'; }
+                                else { btn.style.background = 'rgba(255,71,87,0.15)'; btn.style.borderColor = '#ff4757'; btn.style.color = '#ff4757'; }
+                                grid.querySelectorAll('button').forEach(function (b) {
+                                    b.style.cursor = 'default';
+                                    if (b.textContent === q.answer && !correct) { b.style.background = 'rgba(56,176,0,0.2)'; b.style.borderColor = '#38b000'; b.style.color = '#5af542'; }
+                                });
+                                document.getElementById('quiz-score').textContent = 'Score: ' + quizState.score + '/' + data.mcqs.length;
+                            };
+                            grid.appendChild(btn);
+                        });
+                        card.appendChild(grid);
+                        mcqContainer.appendChild(card);
+                    });
+                }
+
+                // Build Subjective Q&A using DOM
+                if (data.subjective) {
+                    var subCont = document.getElementById('view-subjective');
+                    subCont.innerHTML = '';
+                    function makeQABlock(title, questions) {
+                        var h = document.createElement('h4');
+                        h.style.cssText = 'color:var(--secondary);margin-bottom:1rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.5rem;margin-top:1.5rem;';
+                        h.textContent = title; subCont.appendChild(h);
+                        questions.forEach(function (q) {
+                            var box = document.createElement('div');
+                            box.style.cssText = 'background:rgba(0,0,0,0.2);padding:1.5rem;border-radius:8px;margin-bottom:1rem;';
+                            var qEl = document.createElement('strong'); qEl.style.color = 'var(--primary)'; qEl.textContent = 'Q: ' + q.question;
+                            var aEl = document.createElement('div'); aEl.style.cssText = 'margin-top:10px;color:var(--text-muted);line-height:1.6;'; aEl.textContent = 'A: ' + q.answer;
+                            box.appendChild(qEl); box.appendChild(aEl); subCont.appendChild(box);
+                        });
+                    }
+                    if (data.subjective.two_marks && data.subjective.two_marks.length) makeQABlock('2-Mark Questions', data.subjective.two_marks);
+                    if (data.subjective.five_marks && data.subjective.five_marks.length) makeQABlock('5-Mark Questions', data.subjective.five_marks);
+                }
+
+                // Build visual Mindmap using DOM
+                if (data.mindmap) {
+                    var mmCont = document.getElementById('view-mindmap');
+                    mmCont.innerHTML = '';
+                    var rootWrap = document.createElement('div'); rootWrap.style.cssText = 'text-align:center;margin-bottom:2rem;';
+                    var rootChip = document.createElement('div'); rootChip.style.cssText = 'display:inline-block;padding:0.8rem 2rem;background:linear-gradient(135deg,var(--primary),var(--primary-hover));border-radius:30px;font-size:1.1rem;font-weight:700;color:white;box-shadow:0 4px 20px var(--primary-glow);';
+                    rootChip.textContent = data.mindmap.root || 'Main Topic';
+                    rootWrap.appendChild(rootChip); mmCont.appendChild(rootWrap);
+                    if (data.mindmap.branches && data.mindmap.branches.length) {
+                        var brGrid = document.createElement('div'); brGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;';
+                        data.mindmap.branches.forEach(function (br) {
+                            var bc = document.createElement('div');
+                            bc.style.cssText = 'padding:1.2rem;background:rgba(0,245,212,0.07);border:1px solid rgba(0,245,212,0.25);border-radius:12px;color:var(--secondary);font-weight:600;text-align:center;transition:transform 0.2s, background 0.2s;cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center;';
+                            var branchTitle = typeof br === 'string' ? br : (br.title || br.name || JSON.stringify(br));
+                            var branchNote = typeof br === 'string'
+                                ? `This is a key concept generated by the AI: ${br}. (The AI model returned a simplified format for this module, so a full paragraph note wasn't generated. Try re-running the generator for deeper analysis!)`
+                                : (br.note || `This is a key concept: ${branchTitle}.`);
+
+                            bc.innerHTML = `<span>${branchTitle}</span><span style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem; font-weight:400;">📄 Click for notes</span>`;
+
+                            bc.onmouseover = function () { this.style.transform = 'translateY(-4px)'; this.style.background = 'rgba(0,245,212,0.12)'; };
+                            bc.onmouseout = function () { this.style.transform = 'translateY(0)'; this.style.background = 'rgba(0,245,212,0.07)'; };
+
+                            bc.onclick = function () {
+                                document.getElementById('modal-title').textContent = branchTitle;
+                                document.getElementById('modal-body').textContent = branchNote;
+                                document.getElementById('note-modal').classList.add('active');
+                            };
+
+                            brGrid.appendChild(bc);
+                        });
+                        mmCont.appendChild(brGrid);
+                    }
+                }
+
+                // Auto-show MCQs tab by default
+                showTab('mcqs', 'Smart MCQs');
+                document.getElementById('api-output-view').scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+
+            // Drag and drop UI effects
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-active'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-active'), false);
+            });
+
+            dropZone.addEventListener('drop', async (e) => {
+                let dt = e.dataTransfer;
+                let files = dt.files;
+                if (files.length > 0) {
+                    const h3 = dropZone.querySelector('h3');
+                    h3.innerText = `Processing: ${files[0].name}...`;
+                    h3.style.color = 'var(--warning)';
+
+                    // Push the file directly to the backend Multer service
+                    const formData = new FormData();
+                    formData.append('document', files[0]);
+
+                    try {
+                        const response = await fetch('http://localhost:3000/api/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+
+                        if (result.success) {
+                            h3.innerText = `Processed Successfully: ${files[0].name}`;
+                            h3.style.color = 'var(--success)';
+                            renderAIOutput(result.data);
+                        } else {
+                            h3.innerText = result.error || 'Upload failed.';
+                            h3.style.color = 'red';
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        h3.innerText = 'Server disconnected.';
+                        h3.style.color = 'red';
+                    }
+                }
+            });
+
+            // Button Loading Effect
+            const btn = document.getElementById('generate-btn');
+            const textArea = document.querySelector('.note-input');
+
+            btn.addEventListener('click', async function () {
+                const textContent = textArea.value.trim();
+
+                if (!textContent) {
+                    alert('Please paste some text or upload a file above.');
+                    return;
+                }
+
+                const originalText = this.innerHTML;
+                this.innerHTML = '<span>⚙️ Processing with Deep AI Analysis...</span>';
+                this.style.opacity = '0.8';
+                this.style.transform = 'scale(0.98)';
+
+                try {
+                    const response = await fetch('http://localhost:3000/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: textContent })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        renderAIOutput(result.data);
+                    } else {
+                        alert(result.error || 'Backend generation failed.');
+                    }
+                } catch (err) {
+                    alert('Could not reach backend locally on port 3000.');
+                    console.error(err);
+                } finally {
+                    this.innerHTML = originalText;
+                    this.style.opacity = '1';
+                    this.style.transform = 'scale(1)';
+                }
+            });
+        });
+    </script>
+
+    <!-- Three.js Animated Background Shader logic -->
+    <script>
+        const canvas = document.getElementById('bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+        const vertexShader = `
+          uniform float time;
+          uniform float intensity;
+          varying vec2 vUv;
+          varying vec3 vPosition;
+          
+          void main() {
+            vUv = uv;
+            vPosition = position;
+            
+            vec3 pos = position;
+            pos.y += sin(pos.x * 10.0 + time) * 0.1 * intensity;
+            pos.x += cos(pos.y * 8.0 + time * 1.5) * 0.05 * intensity;
+            
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `;
+
+        const fragmentShader = `
+          uniform float time;
+          uniform float intensity;
+          uniform vec3 color1;
+          uniform vec3 color2;
+          varying vec2 vUv;
+          varying vec3 vPosition;
+          
+          void main() {
+            vec2 uv = vUv;
+            
+            // Create animated noise pattern
+            float noise = sin(uv.x * 20.0 + time) * cos(uv.y * 15.0 + time * 0.8);
+            noise += sin(uv.x * 35.0 - time * 2.0) * cos(uv.y * 25.0 + time * 1.2) * 0.5;
+            
+            // Mix colors based on noise and position
+            vec3 color = mix(color1, color2, noise * 0.5 + 0.5);
+            color = mix(color, vec3(1.0), pow(abs(noise), 2.0) * intensity);
+            
+            // Add glow effect
+            float glow = 1.0 - length(uv - 0.5) * 2.0;
+            glow = pow(glow, 2.0);
+            
+            gl_FragColor = vec4(color * glow, glow * 0.4); // slightly lowered alpha glow for background subtlety
+          }
+        `;
+
+        // We use the dark theme colors from the original MeshGradient component
+        const uniforms = {
+            time: { value: 0 },
+            intensity: { value: 1.0 },
+            color1: { value: new THREE.Color("#0f121d") }, // Dark base
+            color2: { value: new THREE.Color("#9d4edd") }  // Purple highlights
+        };
+
+        const material = new THREE.ShaderMaterial({
+            uniforms: uniforms,
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+
+        // Large plane that covers screen
+        const geometry = new THREE.PlaneGeometry(2, 2, 32, 32);
+        const plane = new THREE.Mesh(geometry, material);
+        scene.add(plane);
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsedTime = clock.getElapsedTime();
+            uniforms.time.value = elapsedTime * 0.5; // Half speed for subtle movement
+            uniforms.intensity.value = 1.0 + Math.sin(elapsedTime * 2) * 0.3;
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
