@@ -1,12 +1,15 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require('fs');
 
-const apiKey = process.env.GEMINI_API_KEY || "YOUR_GEMINI_API_KEY_HERE";
-const genAI = new GoogleGenerativeAI(apiKey);
+function getGenAI() {
+    const apiKey = process.env.GEMINI_API_KEY || "YOUR_GEMINI_API_KEY_HERE";
+    return new GoogleGenerativeAI(apiKey);
+}
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
 async function callGeminiJSON(prompt, retries = 3) {
+    const genAI = getGenAI();
     for (let i = 0; i < retries; i++) {
         try {
             // Use gemini-2.5-flash as it's the recommended model for general text tasks and JSON
@@ -61,6 +64,7 @@ async function generateYouTubeQueries(concepts) {
 
 async function analyzeImage(imagePath, mimeType) {
     try {
+        const genAI = getGenAI();
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = "Extract all text, concepts, and detailed notes from this image. Explain any diagrams or visual information present. Return the result purely as a JSON object with a single 'text' property containing the full extracted string.";
 
