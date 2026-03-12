@@ -230,6 +230,7 @@
             margin-bottom: 0.4rem;
             background: linear-gradient(to right, #fff, var(--text-muted));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
@@ -526,73 +527,7 @@
             z-index: 1;
         }
 
-        /* Modal styling for Mind Map notes */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(8px);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
 
-        .modal-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .modal-content {
-            background: #111424;
-            border: 1px solid rgba(157, 78, 221, 0.3);
-            border-radius: 16px;
-            padding: 2.5rem;
-            width: 90%;
-            max-width: 600px;
-            position: relative;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-overlay.active .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 1rem;
-            right: 1.5rem;
-            font-size: 1.5rem;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-
-        .modal-close:hover {
-            color: var(--danger-glow);
-        }
-
-        .modal-title {
-            color: var(--secondary);
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 0.5rem;
-        }
-
-        .modal-body {
-            color: var(--text-main);
-            line-height: 1.7;
-            font-size: 1.05rem;
-        }
 
         @media(max-width: 1024px) {
             .app-layout {
