@@ -748,6 +748,10 @@
         spline-viewer::part(logo) {
             display: none !important;
         }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 
@@ -856,7 +860,26 @@
                 </div>
             </section>
 
-
+            <!-- Loading Progress Overlay -->
+            <section id="loading-overlay" style="display:none; margin-top:2rem;">
+                <div class="glass-panel" style="padding:2.5rem; text-align:center;">
+                    <div id="loading-icon" style="font-size:3rem; margin-bottom:1rem; animation: spin 2s linear infinite; display:inline-block;">⚙️</div>
+                    <h3 id="loading-title" style="color:var(--primary); font-size:1.4rem; margin-bottom:0.5rem;">Processing your content...</h3>
+                    <p id="loading-step" style="color:var(--text-muted); font-size:0.95rem; margin-bottom:1.5rem;">Uploading file...</p>
+                    <!-- Progress bar track -->
+                    <div style="background:rgba(255,255,255,0.08); border-radius:50px; height:10px; overflow:hidden; margin-bottom:1rem;">
+                        <div id="progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,var(--primary),var(--secondary)); border-radius:50px; transition:width 0.6s ease;"></div>
+                    </div>
+                    <p id="progress-label" style="color:var(--text-muted); font-size:0.85rem;">0%</p>
+                    <!-- Step indicators -->
+                    <div style="display:flex; justify-content:center; gap:1.5rem; margin-top:1.5rem; flex-wrap:wrap;">
+                        <div class="step-chip" id="step-upload" style="opacity:0.4; font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;"><span>📤</span> Uploading</div>
+                        <div class="step-chip" id="step-extract" style="opacity:0.4; font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;"><span>🔍</span> Extracting</div>
+                        <div class="step-chip" id="step-ai" style="opacity:0.4; font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;"><span>🤖</span> AI Analysis</div>
+                        <div class="step-chip" id="step-done" style="opacity:0.4; font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;"><span>✅</span> Done</div>
+                    </div>
+                </div>
+            </section>
 
             <!-- AI Output Viewer -->
             <section class="glass-panel" id="api-output-view" style="display: none; margin-top: 2rem;">
@@ -1159,27 +1182,36 @@
                     h3.innerText = `Processing: ${files[0].name}...`;
                     h3.style.color = 'var(--warning)';
 
+                    // Show loading overlay
+                    showProgress();
+                    setProgressStep('upload', 10, 'Uploading file to server...');
+
                     // Push the file directly to the backend Multer service
                     const formData = new FormData();
                     formData.append('document', files[0]);
 
                     try {
+                        setProgressStep('extract', 35, 'Extracting text from your document...');
                         const response = await fetch('http://localhost:3000/api/upload', {
                             method: 'POST',
                             body: formData
                         });
+                        setProgressStep('ai', 70, 'AI is analyzing and generating your study kit...');
                         const result = await response.json();
 
                         if (result.success) {
+                            setProgressStep('done', 100, 'All done! Showing your results...');
                             h3.innerText = `Processed Successfully: ${files[0].name}`;
                             h3.style.color = 'var(--success)';
-                            renderAIOutput(result.data);
+                            setTimeout(() => { hideProgress(); renderAIOutput(result.data); }, 600);
                         } else {
+                            hideProgress();
                             h3.innerText = result.error || 'Upload failed.';
                             h3.style.color = 'red';
                         }
                     } catch (err) {
                         console.error(err);
+                        hideProgress();
                         h3.innerText = 'Server disconnected.';
                         h3.style.color = 'red';
                     }
@@ -1199,25 +1231,33 @@
                 }
 
                 const originalText = this.innerHTML;
-                this.innerHTML = '<span>⚙️ Processing with Deep AI Analysis...</span>';
+                this.innerHTML = '<span>⚙️ Processing...</span>';
                 this.style.opacity = '0.8';
                 this.style.transform = 'scale(0.98)';
 
+                showProgress();
+                setProgressStep('upload', 15, 'Sending your content to the server...');
+
                 try {
+                    setProgressStep('extract', 40, 'Reading and parsing your text...');
                     const response = await fetch('http://localhost:3000/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ content: textContent })
                     });
 
+                    setProgressStep('ai', 75, 'AI is analyzing and building your study kit...');
                     const result = await response.json();
 
                     if (result.success) {
-                        renderAIOutput(result.data);
+                        setProgressStep('done', 100, 'All done! Showing your results...');
+                        setTimeout(() => { hideProgress(); renderAIOutput(result.data); }, 600);
                     } else {
+                        hideProgress();
                         alert(result.error || 'Backend generation failed.');
                     }
                 } catch (err) {
+                    hideProgress();
                     alert('Could not reach backend locally on port 3000.');
                     console.error(err);
                 } finally {
@@ -1226,6 +1266,38 @@
                     this.style.transform = 'scale(1)';
                 }
             });
+
+            // --- Progress helpers ---
+            function showProgress() {
+                document.getElementById('loading-overlay').style.display = 'block';
+                document.getElementById('loading-overlay').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Reset
+                setProgress(0, 'Starting up...');
+                ['step-upload','step-extract','step-ai','step-done'].forEach(id => {
+                    var el = document.getElementById(id);
+                    el.style.opacity = '0.4';
+                    el.style.color = 'var(--text-muted)';
+                });
+            }
+            function hideProgress() {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+            function setProgress(pct, msg) {
+                document.getElementById('progress-bar').style.width = pct + '%';
+                document.getElementById('progress-label').textContent = pct + '%';
+                document.getElementById('loading-step').textContent = msg;
+            }
+            function setProgressStep(step, pct, msg) {
+                setProgress(pct, msg);
+                var stepOrder = ['upload','extract','ai','done'];
+                var idx = stepOrder.indexOf(step);
+                stepOrder.forEach(function(s, i) {
+                    var el = document.getElementById('step-' + s);
+                    if (i < idx) { el.style.opacity = '1'; el.style.color = 'var(--primary)'; }
+                    else if (i === idx) { el.style.opacity = '1'; el.style.color = 'var(--secondary)'; }
+                    else { el.style.opacity = '0.4'; el.style.color = 'var(--text-muted)'; }
+                });
+            }
         });
     </script>
 
